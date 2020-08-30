@@ -19,3 +19,6 @@ This is a script from my framework that I've decided to convert over to ESX as I
 
 ### Recommended Resources
 Mythic Notify & progressBars
+
+#### Discord
+Howdy#8276
