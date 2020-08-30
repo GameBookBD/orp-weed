@@ -1,13 +1,16 @@
-ORP = nil
+ESX = nil
 
-Citizen.CreateThread(function() 
-    while true do
-        Citizen.Wait(10)
-        if ORP == nil then
-            TriggerEvent("ORP:GetObject", function(obj) ORP = obj end)    
-            Citizen.Wait(200)
-        end
-    end
+Citizen.CreateThread(function()
+	while ESX == nil do
+		TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
+		Citizen.Wait(0)
+	end
+
+	while ESX.GetPlayerData().job == nil do
+		Citizen.Wait(10)
+	end
+
+	ESX.PlayerData = ESX.GetPlayerData()
 end)
 
 Keys = {
@@ -21,7 +24,6 @@ Keys = {
 	['LEFT'] = 174, ['RIGHT'] = 175, ['TOP'] = 27, ['DOWN'] = 173,
 }
 
-local Thread = CreateThread
 local SpawnedPlants = {}
 local InteractedPlant = nil
 local HarvestedPlants = {}
@@ -29,7 +31,7 @@ local canHarvest = true
 local closestPlant = nil
 local isDoingAction = false
 
-Thread(function()
+Citizen.CreateThread(function()
     while true do
     Citizen.Wait(150)
 
@@ -119,6 +121,41 @@ Thread(function()
 
 end)
 
+function DestroyPlant()
+    local plant = GetClosestPlant()
+    local hasDone = false
+
+    for k, v in pairs(HarvestedPlants) do
+        if v == plant.id then
+            hasDone = true
+        end
+    end
+
+    if not hasDone then
+        table.insert(HarvestedPlants, plant.id)
+        local ped = GetPlayerPed(-1)
+        isDoingAction = true
+        TriggerServerEvent('orp:weed:plantHasBeenHarvested', plant.id)
+
+        RequestAnimDict('amb@prop_human_bum_bin@base')
+        while not HasAnimDictLoaded('amb@prop_human_bum_bin@base') do
+            Citizen.Wait(0)
+        end
+
+        TaskPlayAnim(ped, 'amb@prop_human_bum_bin@base', 'base', 8.0, 8.0, -1, 1, 1, 0, 0, 0)
+        FreezeEntityPosition(ped, true)
+        exports['progressBars']:startUI(5000, "Destroying...")
+        Citizen.Wait(5000)
+        TriggerServerEvent('orp:weed:destroyPlant', plant.id)
+        isDoingAction = false
+        canHarvest = true
+        FreezeEntityPosition(ped, false)
+        ClearPedTasksImmediately(ped)
+    else
+        exports['mythic_notify']:DoHudText('error', 'Error')
+    end
+end
+
 function HarvestWeedPlant()
     local plant = GetClosestPlant()
     local hasDone = false
@@ -141,15 +178,16 @@ function HarvestWeedPlant()
         end
 
         TaskPlayAnim(ped, 'amb@prop_human_bum_bin@base', 'base', 8.0, 8.0, -1, 1, 1, 0, 0, 0)
-        ORP.Functions.Progressbar("harvest_plant", "Harvesting Plant...", math.random(5000, 6000), false, false, {}, {}, {}, {}, function() -- Done
-            TriggerServerEvent('orp:weed:harvestWeed', plant.id)
-            canHarvest = true
-            isDoingAction = false
-        end, function() -- Cancel
-            ORP.Functions.Notify("Cancelled", "error")
-        end)
+        FreezeEntityPosition(ped, true)
+        exports['progressBars']:startUI(5000, "Harvesting...")
+        Citizen.Wait(5000)
+        TriggerServerEvent('orp:weed:harvestWeed', plant.id)
+        isDoingAction = false
+        canHarvest = true
+        FreezeEntityPosition(ped, false)
+        ClearPedTasksImmediately(ped)
     else
-        ORP.Functions.Notify("Error", "error")
+        exports['mythic_notify']:DoHudText('error', 'Error')
     end
 end
 
@@ -161,52 +199,59 @@ function RemovePlantFromTable(plantId)
     end
 end
 
-Thread(function()
+Citizen.CreateThread(function()
     while true do
         Citizen.Wait(0)
-        if ORP ~= nil then
             local InRange = false
             local ped = GetPlayerPed(-1)
             local pos = GetEntityCoords(ped)
 
             for k, v in pairs(Config.Plants) do
                 if GetDistanceBetweenCoords(pos.x, pos.y, pos.z, v.x, v.y, v.z, true) < 1.3 and not isDoingAction and not v.beingHarvested and not IsPedInAnyVehicle(GetPlayerPed(-1), false) then
-                    if v.growth < 100 then
+                    if ESX.PlayerData.job.name == 'police' then
                         local plant = GetClosestPlant()
-                        ORP.Functions.DrawText3D(v.x, v.y, v.z, 'Thirst: ' .. v.thirst .. '% - Hunger: ' .. v.hunger .. '% - Growth: ' ..  v.growth .. '% -  Quality: ' .. v.quality)
-                        ORP.Functions.DrawText3D(v.x, v.y, v.z - 0.18, '~b~G~w~ - Water      ~y~H~w~ - Feed')
+                        DrawText3D(v.x, v.y, v.z, 'Thirst: ' .. v.thirst .. '% - Hunger: ' .. v.hunger .. '% - Growth: ' ..  v.growth .. '% -  Quality: ' .. v.quality)
+                        DrawText3D(v.x, v.y, v.z - 0.18, '~b~G~w~ - Destroy Plant')
                         if IsControlJustReleased(0, Keys["G"]) then
                             if v.id == plant.id then
-                                TriggerServerEvent('orp:server:checkPlayerHasThisItem', 'water_bottle', 'orp:weed:client:waterPlant', true)
-                            end
-                        elseif IsControlJustReleased(0, Keys["H"]) then
-                            if v.id == plant.id then
-                                TriggerServerEvent('orp:server:checkPlayerHasThisItem', 'fertilizer', 'orp:weed:client:feedPlant', true)
+                                DestroyPlant()
                             end
                         end
                     else
-                        ORP.Functions.DrawText3D(v.x, v.y, v.z, '[Quality: ' .. v.quality .. ']')
-                        ORP.Functions.DrawText3D(v.x, v.y, v.z - 0.18, '~g~E~w~ - Harvest')
-                        if IsControlJustReleased(0, Keys["E"]) and canHarvest then
+                        if v.growth < 100 then
                             local plant = GetClosestPlant()
-                            if v.id == plant.id then
-                                HarvestWeedPlant()
+                            DrawText3D(v.x, v.y, v.z, 'Thirst: ' .. v.thirst .. '% - Hunger: ' .. v.hunger .. '% - Growth: ' ..  v.growth .. '% -  Quality: ' .. v.quality)
+                            DrawText3D(v.x, v.y, v.z - 0.18, '~b~G~w~ - Water      ~y~H~w~ - Feed')
+                            if IsControlJustReleased(0, Keys["G"]) then
+                                if v.id == plant.id then
+                                    TriggerServerEvent('orp:server:checkPlayerHasThisItem', 'water_bottle', 'orp:weed:client:waterPlant', true)
+                                end
+                            elseif IsControlJustReleased(0, Keys["H"]) then
+                                if v.id == plant.id then
+                                    TriggerServerEvent('orp:server:checkPlayerHasThisItem', 'fertilizer', 'orp:weed:client:feedPlant', true)
+                                end
+                            end
+                        else
+                            DrawText3D(v.x, v.y, v.z, '[Quality: ' .. v.quality .. ']')
+                            DrawText3D(v.x, v.y, v.z - 0.18, '~g~E~w~ - Harvest')
+                            if IsControlJustReleased(0, Keys["E"]) and canHarvest then
+                                local plant = GetClosestPlant()
+                                if v.id == plant.id then
+                                    HarvestWeedPlant()
+                                end
                             end
                         end
                     end
                 end
             end
-
-        end
     end
 end)
 
 local IsSearching = false
 
-Thread(function()
+Citizen.CreateThread(function()
     while true do
         Citizen.Wait(0)
-        if ORP ~= nil then
             local ped = GetPlayerPed(-1)
             local pos = GetEntityCoords(ped)
             local InRange = false
@@ -218,7 +263,7 @@ Thread(function()
             end
 
             if InRange and not IsSearching and not IsPedInAnyVehicle(GetPlayerPed(-1), false) then
-                ORP.Functions.DrawText3D(pos.x, pos.y, pos.z, '~y~G~w~ - Search')
+                DrawText3D(pos.x, pos.y, pos.z, '~y~G~w~ - Search')
                 if IsControlJustReleased(0, Keys["G"]) then
                     IsSearching = true
                     RequestAnimDict('amb@prop_human_bum_bin@base')
@@ -227,23 +272,18 @@ Thread(function()
                     end
 
                     TaskPlayAnim(ped, 'amb@prop_human_bum_bin@base', 'base', 8.0, 8.0, -1, 1, 1, 0, 0, 0)
-                    ORP.Functions.Progressbar("searching_seeds", "Searching...", math.random(9000, 14000), false, true, {}, {}, {}, {}, function() -- Done
-                        local chance = math.random(1, 10)
-
-                        if chance > 7 then
-                            TriggerServerEvent('orp:weed:server:giveShittySeed')
-                        end
-                        Citizen.Wait(3000)
-                        IsSearching = false
-                    end, function() -- Cancel
-                        Citizen.Wait(3000)
-                        IsSearching = false
-                    end)
+                    FreezeEntityPosition(ped, true)
+                    exports['progressBars']:startUI(10000, "Searching...")
+                    Citizen.Wait(10000)
+                    FreezeEntityPosition(ped, false)
+                    IsSearching = false
+                    if math.random(1, 10) == 7 then
+                        TriggerServerEvent('orp:weed:server:giveShittySeed')
+                    end
                 end
             else
                 Citizen.Wait(3000)
             end
-        end
     end
 end)
 
@@ -278,13 +318,14 @@ end)
 
 RegisterNetEvent('orp:weed:client:notify')
 AddEventHandler('orp:weed:client:notify', function(msg)
-    ORP.Functions.Notify(msg)
+    exports['mythic_notify']:DoHudText('inform', msg)
 end)
 
 RegisterNetEvent('orp:weed:client:waterPlant')
 AddEventHandler('orp:weed:client:waterPlant', function()
     local entity = nil
     local plant = GetClosestPlant()
+    local ped = GetPlayerPed(-1)
     isDoingAction = true
 
     for k, v in pairs(SpawnedPlants) do
@@ -301,13 +342,13 @@ AddEventHandler('orp:weed:client:waterPlant', function()
     end
 
     TaskPlayAnim(ped, 'amb@prop_human_bum_bin@base', 'base', 8.0, 8.0, -1, 1, 1, 0, 0, 0)
-    ORP.Functions.Progressbar("watering_plant", "Watering...", math.random(1000, 2000), false, false, {}, {}, {}, {}, function() -- Done
-        TriggerServerEvent('orp:weed:server:waterPlant', plant.id)
-        ClearPedTasksImmediately(GetPlayerPed(-1))
-        isDoingAction = false
-    end, function() -- Cancel
-        ORP.Functions.Notify("Cancelled", "error")
-    end)
+    FreezeEntityPosition(ped, true)
+    exports['progressBars']:startUI(2000, "Watering...")
+    Citizen.Wait(2000)
+    FreezeEntityPosition(ped, false)
+    TriggerServerEvent('orp:weed:server:waterPlant', plant.id)
+    ClearPedTasksImmediately(GetPlayerPed(-1))
+    isDoingAction = false
 end)
 
 RegisterNetEvent('orp:weed:client:feedPlant')
@@ -330,13 +371,12 @@ AddEventHandler('orp:weed:client:feedPlant', function()
     end
 
     TaskPlayAnim(ped, 'amb@prop_human_bum_bin@base', 'base', 8.0, 8.0, -1, 1, 1, 0, 0, 0)
-    ORP.Functions.Progressbar("fertilizing_plant", "Fertilizing...", math.random(1000, 2000), false, false, {}, {}, {}, {}, function() -- Done
-        TriggerServerEvent('orp:weed:server:feedPlant', plant.id)
-        ClearPedTasksImmediately(GetPlayerPed(-1))
-        isDoingAction = false
-    end, function() -- Cancel
-        ORP.Functions.Notify("Cancelled", "error")
-    end)
+    FreezeEntityPosition(ped, false)
+    exports['progressBars']:startUI(2000, "Fertilizing...")
+    Citizen.Wait(2000)
+    TriggerServerEvent('orp:weed:server:feedPlant', plant.id)
+    ClearPedTasksImmediately(GetPlayerPed(-1))
+    isDoingAction = false
 end)
 
 RegisterNetEvent('orp:weed:client:updateWeedData')
@@ -351,7 +391,7 @@ AddEventHandler('orp:weed:client:plantNewSeed', function(type)
     if CanPlantSeedHere(pos) and not IsPedInAnyVehicle(GetPlayerPed(-1), false) then
         TriggerServerEvent('orp:weed:server:plantNewSeed', type, pos)
     else
-        ORP.Functions.Notify('Too close to another plant', 'error')
+        exports['mythic_notify']:DoHudText('error', 'Too close to another plant')
     end
 end)
 
@@ -365,6 +405,21 @@ AddEventHandler('orp:weed:client:plantSeedConfirm', function()
     Citizen.Wait(1800)
     ClearPedTasks(GetPlayerPed(-1))
 end)
+
+function DrawText3D(x, y, z, text)
+    SetTextScale(0.35, 0.35)
+    SetTextFont(4)
+    SetTextProportional(1)
+    SetTextColour(255, 255, 255, 215)
+    SetTextEntry("STRING")
+    SetTextCentre(true)
+    AddTextComponentString(text)
+    SetDrawOrigin(x,y,z, 0)
+    DrawText(0.0, 0.0)
+    local factor = (string.len(text)) / 370
+    DrawRect(0.0, 0.0+0.0125, 0.017+ factor, 0.03, 0, 0, 0, 75)
+    ClearDrawOrigin()
+end
 
 function CanPlantSeedHere(pos)
     local canPlant = true
