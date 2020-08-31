@@ -277,6 +277,7 @@ Citizen.CreateThread(function()
                     Citizen.Wait(10000)
                     FreezeEntityPosition(ped, false)
                     IsSearching = false
+                    ClearPedTasksImmediately(ped)
                     if math.random(1, 10) == 7 then
                         TriggerServerEvent('orp:weed:server:giveShittySeed')
                     end
