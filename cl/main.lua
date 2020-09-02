@@ -152,7 +152,7 @@ function DestroyPlant()
         FreezeEntityPosition(ped, false)
         ClearPedTasksImmediately(ped)
     else
-        exports['mythic_notify']:DoHudText('error', 'Error')
+        exports['mythic_notify']:SendAlert('error', 'Error')
     end
 end
 
@@ -187,7 +187,7 @@ function HarvestWeedPlant()
         FreezeEntityPosition(ped, false)
         ClearPedTasksImmediately(ped)
     else
-        exports['mythic_notify']:DoHudText('error', 'Error')
+        exports['mythic_notify']:SendAlert('error', 'Error')
     end
 end
 
@@ -319,7 +319,7 @@ end)
 
 RegisterNetEvent('orp:weed:client:notify')
 AddEventHandler('orp:weed:client:notify', function(msg)
-    exports['mythic_notify']:DoHudText('inform', msg)
+    exports['mythic_notify']:SendAlert('inform', msg)
 end)
 
 RegisterNetEvent('orp:weed:client:waterPlant')
@@ -392,7 +392,7 @@ AddEventHandler('orp:weed:client:plantNewSeed', function(type)
     if CanPlantSeedHere(pos) and not IsPedInAnyVehicle(GetPlayerPed(-1), false) then
         TriggerServerEvent('orp:weed:server:plantNewSeed', type, pos)
     else
-        exports['mythic_notify']:DoHudText('error', 'Too close to another plant')
+        exports['mythic_notify']:SendAlert('error', 'Too close to another plant')
     end
 end)
 

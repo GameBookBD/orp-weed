@@ -203,7 +203,7 @@ AddEventHandler('orp:weed:server:waterPlant', function(plantId)
         end
     end
 
-    xPlayer.removeInventoryItem('water', 1)
+    xPlayer.removeInventoryItem('water_bottle', 1)
     TriggerEvent('orp:weed:server:updatePlants')
 end)
 
