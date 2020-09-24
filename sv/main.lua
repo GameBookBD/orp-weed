@@ -16,7 +16,6 @@ end)
 
 Citizen.CreateThread(function()
     TriggerEvent('orp:weed:server:getWeedPlants')
-    print('PLANTS HAVE BEEN LOADED CUNT')
     PlantsLoaded = true
 end)
 
@@ -53,11 +52,12 @@ ESX.RegisterUsableItem('weed_purple-haze_seed', function(source)
 end)
 
 RegisterServerEvent('orp:weed:server:saveWeedPlant')
-AddEventHandler('orp:weed:server:saveWeedPlant', function(data)
+AddEventHandler('orp:weed:server:saveWeedPlant', function(data, plantId)
     local data = json.encode(data)
     
-    MySQL.Async.execute('INSERT INTO weed_plants (properties) VALUES (@properties)', {
+    MySQL.Async.execute('INSERT INTO weed_plants (properties, plantid) VALUES (@properties)', {
         ['@properties'] = data,
+        ['@plantid'] = plantId
     }, function ()
     end)
 end)
@@ -101,7 +101,7 @@ AddEventHandler('orp:weed:server:plantNewSeed', function(type, location)
     else
         table.insert(Config.Plants, SeedData)
         TriggerClientEvent('orp:weed:client:plantSeedConfirm', src)
-        TriggerEvent('orp:weed:server:saveWeedPlant', SeedData)
+        TriggerEvent('orp:weed:server:saveWeedPlant', SeedData, plantId)
         TriggerEvent('orp:weed:server:updatePlants')
     end
 end)
@@ -179,8 +179,6 @@ AddEventHandler('orp:weed:harvestWeed', function(plantId)
         else
             xPlayer.addInventoryItem(Config.BadSeedRewards, math.random(1, 2))
         end
-    else
-        print('did not find')
     end
 end)
 
@@ -227,21 +225,16 @@ end)
 
 RegisterServerEvent('orp:weed:server:updateWeedPlant')
 AddEventHandler('orp:weed:server:updateWeedPlant', function(id, data)
-    local result = MySQL.Sync.fetchAll('SELECT * FROM weed_plants')
-
-    if result[1] then
-        for i = 1, #result do
-            local plantData = json.decode(result[i].properties)
-            if plantData.id == id then
-                local newData = json.encode(data)
-                MySQL.Async.execute('UPDATE weed_plants SET properties = @properties WHERE id = @id', {
-                    ['@properties'] = newData,
-                    ['@id'] = result[i].id,
-                }, function ()
-                end)
-            end
+    local result = MySQL.Sync.fetchAll('SELECT * FROM weed_plants WHERE plantid = @plantid', {
+        if result[1] then
+            local newData = json.encode(data)
+            MySQL.Async.execute('UPDATE weed_plants SET properties = @properties WHERE plantid = @id', {
+                ['@properties'] = newData,
+                ['@id'] = id
+            })
         end
-    end
+    }, function()
+    end)
 end)
 
 RegisterServerEvent('orp:weed:server:weedPlantRemoved')
