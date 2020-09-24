@@ -226,15 +226,16 @@ end)
 RegisterServerEvent('orp:weed:server:updateWeedPlant')
 AddEventHandler('orp:weed:server:updateWeedPlant', function(id, data)
     local result = MySQL.Sync.fetchAll('SELECT * FROM weed_plants WHERE plantid = @plantid', {
-        if result[1] then
-            local newData = json.encode(data)
-            MySQL.Async.execute('UPDATE weed_plants SET properties = @properties WHERE plantid = @id', {
-                ['@properties'] = newData,
-                ['@id'] = id
-            })
-        end
-    }, function()
-    end)
+        ['@plantid'] = id
+    })
+
+    if result[1] then
+        local newData = json.encode(data)
+        MySQL.Async.execute('UPDATE weed_plants SET properties = @properties WHERE plantid = @id', {
+            ['@properties'] = newData,
+            ['@id'] = id
+        })
+    end
 end)
 
 RegisterServerEvent('orp:weed:server:weedPlantRemoved')
